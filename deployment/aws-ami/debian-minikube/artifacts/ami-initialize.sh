@@ -2,9 +2,11 @@
 
 LOG_PATH=/var/log/sre-init.log
 ERROR_LOG_PATH=$LOG_PATH
+HELM_RELEASE_NAME=rule-engine
 
 log() { echo "[INFO] $(date) $1" >> $LOG_PATH; }
 log_err() { echo "[ERROR] $(date) $1" >> $ERROR_LOG_PATH; }
+# shellcheck disable=SC2120
 get_imds_token () {
   duration="10"  # must be an integer
   if [ -n "$1" ]; then
@@ -68,8 +70,8 @@ install_docker() {
 install_minikube() {
   # https://minikube.sigs.k8s.io/docs/start
   log "Installing minikube"
-  curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube_latest_$(dpkg --print-architecture).deb
-  sudo dpkg -i minikube_latest_$(dpkg --print-architecture).deb && rm minikube_latest_$(dpkg --print-architecture).deb
+  curl -LO "https://storage.googleapis.com/minikube/releases/latest/minikube_latest_$(dpkg --print-architecture).deb"
+  sudo dpkg -i "minikube_latest_$(dpkg --print-architecture).deb" && rm "minikube_latest_$(dpkg --print-architecture).deb"
 }
 install_kubectl() {
   # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/#install-kubectl-binary-with-curl-on-linux
@@ -229,23 +231,19 @@ kubectl create secret generic modular-service-secret --from-literal=system-passw
 kubectl create secret generic defect-dojo-secret --from-literal=secret-key="$(generate_password 50)" --from-literal=credential-aes-256-key=$(generate_password) --from-literal=db-username=defectdojo --from-literal=db-password=$(generate_password 30 -hex)
 
 helm plugin install https://github.com/hypnoglow/helm-s3.git
-helm repo add sre s3://charts-repository/charts/
-helm repo update
+helm repo add syndicate s3://charts-repository/syndicate/
+helm repo update syndicate
 
-helm install vault sre/vault
-helm install minio sre/minio
-helm install mongo sre/mongo
-helm install modular-service sre/modular-service
-helm install modular-api sre/modular-api
-helm install rule-engine sre/rule-engine
-helm install defectdojo sre/defectdojo
+helm install "$HELM_RELEASE_NAME" syndicate/rule-engine --version $RULE_ENGINE_RELEASE
+helm install defectdojo syndicate/defectdojo
 EOF
 
 log "Downloading artifacts"
 sudo mkdir -p "$SRE_LOCAL_PATH/releases/$RULE_ENGINE_RELEASE"
 sudo wget -O "$SRE_LOCAL_PATH/releases/$RULE_ENGINE_RELEASE/modular_cli.tar.gz" "https://github.com/$GITHUB_REPO/releases/download/$RULE_ENGINE_RELEASE/modular_cli.tar.gz"  # todo get from modular-cli repo
 sudo wget -O "$SRE_LOCAL_PATH/releases/$RULE_ENGINE_RELEASE/sre_obfuscator.tar.gz" "https://github.com/$GITHUB_REPO/releases/download/$RULE_ENGINE_RELEASE/sre_obfuscator.tar.gz"
-sudo wget -O "/usr/local/bin/sre-init" "https://github.com/$GITHUB_REPO/releases/download/$RULE_ENGINE_RELEASE/sre-init.sh"
+sudo wget -O "$SRE_LOCAL_PATH/releases/$RULE_ENGINE_RELEASE/sre-init.sh" "https://github.com/$GITHUB_REPO/releases/download/$RULE_ENGINE_RELEASE/sre-init.sh"
+sudo cp "$SRE_LOCAL_PATH/releases/$RULE_ENGINE_RELEASE/sre-init.sh" /usr/local/bin/sre-init
 sudo chmod +x /usr/local/bin/sre-init
 sudo chown -R $FIRST_USER:$FIRST_USER "$SRE_LOCAL_PATH"
 
